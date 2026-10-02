@@ -67,6 +67,8 @@ export function StudioProvider({ children }) {
     const token = params.get('auth_token');
     const tgUserParam = params.get('tg_user');
 
+    const hash = window.location.hash || '';
+
     if (tgUserParam) {
       try {
         const decoded = JSON.parse(decodeURIComponent(atob(tgUserParam)));
@@ -75,6 +77,7 @@ export function StudioProvider({ children }) {
           setTelegramUserState(profile);
           setUser(authService.getUser());
           addToast(`Xush kelibsiz, ${profile.fullName || profile.name}!`, 'success');
+          setCurrentView(hash.includes('history') ? 'history' : 'dashboard');
         }
       } catch (err) {
         console.error('Error decoding tg_user param:', err);
@@ -88,6 +91,7 @@ export function StudioProvider({ children }) {
           setTelegramUserState(verifiedUser);
           setUser(authService.getUser());
           addToast(`Xush kelibsiz, ${verifiedUser.fullName || verifiedUser.name}!`, 'success');
+          setCurrentView(hash.includes('history') ? 'history' : 'dashboard');
         }
       });
       // Clean query string

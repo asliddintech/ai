@@ -94,6 +94,9 @@ async function botCall(method, payload = {}) {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
+    if (!data.ok) {
+      console.warn(`[Telegram API Warning] ${method}:`, data.description);
+    }
     return data;
   } catch (err) {
     console.error(`[Telegram API Error] ${method}:`, err.message);
@@ -330,7 +333,8 @@ async function handleMessage(message) {
       return;
     }
 
-    user = await ensureUser(from, text);
+    const cleanName = text.replace(/[*_`[\]\\]/g, '').trim() || text.trim();
+    user = await ensureUser(from, cleanName);
     user.isNameRegistered = true;
     users[telegramId] = user;
     saveUsers();

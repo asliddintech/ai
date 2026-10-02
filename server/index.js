@@ -130,7 +130,21 @@ app.post('/api/generate/optimize', (req, res) => {
 
 // Client SPA fallback
 app.get('*', (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
+  const indexPath = path.join(distPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.type('html').send(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>AI Video Prompt Studio</title></head>
+        <body style="font-family:sans-serif; background:#0A0D14; color:#F8FAFC; padding:2rem; text-align:center;">
+          <h2>AI Video Prompt Studio Server is Running</h2>
+          <p>Please run <code>npm run build</code> or visit Vite dev server at <a href="http://localhost:5173" style="color:#6366F1;">http://localhost:5173</a>.</p>
+        </body>
+      </html>
+    `);
+  }
 });
 
 // Start Express server and launch Telegram Bot simultaneously
