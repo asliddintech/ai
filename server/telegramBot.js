@@ -190,11 +190,19 @@ export function updateUser(telegramId, data) {
   return null;
 }
 
-// Main reply keyboard
-function getMainKeyboard() {
+// Main reply keyboard with WebApp integration
+function getMainKeyboard(user = null) {
+  const encoded = user ? encodeUserDataForUrl(user) : '';
+  const webUrl = (user && user.token)
+    ? `${VERCEL_URL}/?auth_token=${user.token}&tg_user=${encoded}`
+    : VERCEL_URL;
+
   return {
     keyboard: [
-      [{ text: '🎬 Saytga Kirish' }, { text: '👤 Shaxsiy Kabinet' }],
+      [
+        { text: '🎬 Saytga Kirish', web_app: { url: webUrl } },
+        { text: '👤 Shaxsiy Kabinet' }
+      ],
       [{ text: '⚙️ Sozlamalar' }, { text: '📊 Mening Loyihalarim' }],
       [{ text: 'ℹ️ Yordam / Qo\'llanma' }]
     ],
@@ -252,21 +260,18 @@ async function ensureUser(from, customName = null) {
 async function sendLoginLinks(chatId, user) {
   const encoded = encodeUserDataForUrl(user);
   const vercelUrl = `${VERCEL_URL}/?auth_token=${user.token}&tg_user=${encoded}`;
-  const viteUrl = `http://localhost:5173/?auth_token=${user.token}&tg_user=${encoded}`;
 
   const textMessage = 
 `🎬 *AI VIDEO PROMPT STUDIO — SAYTGA KIRISH*
 
 👤 *Foydalanuvchi:* *${user.fullName || user.name}*
-🌟 *Maqomi:* ${user.tier || 'Studio Pro'}
+🌟 *Maqomi:* ${user.tier || 'Studio Pro (Tasdiqlangan)'}
 🆔 *ID:* \`${user.telegramId}\`
 
-Studiyaga kirish uchun rasmiy havola:
-
-🌐 *Jonli Saytga Kirish (Vercel):*
+Studiyaga kirish uchun quyidagi havolani bosing:
 👉 ${vercelUrl}
 
-💡 *Eslatma:* Ushbu havola orqali kirsangiz, ism-familiyangiz va Telegram suratingiz saytda darhol avtomatik ochiladi hamda Shaxsiy Kabinetingizga kirasiz!`;
+💡 *Eslatma:* Ushbu havolani bosishingiz bilan ism-familiyangiz va profilingiz saytda darhol avtomatik ochiladi hamda Shaxsiy Kabinetingizga kirasiz!`;
 
   await botCall('sendMessage', {
     chat_id: chatId,
@@ -275,17 +280,12 @@ Studiyaga kirish uchun rasmiy havola:
     disable_web_page_preview: true,
     reply_markup: {
       inline_keyboard: [
-        [{ text: '🚀 Saytga Kirish (Vercel)', url: vercelUrl }],
+        [{ text: '🎬 Saytga Kirish (Telegramda Ochish)', web_app: { url: vercelUrl } }],
+        [{ text: '🌐 Brauzerda Ochish (Tashqi Havola)', url: vercelUrl }],
         [{ text: '👤 Shaxsiy Kabinet', callback_data: 'view_cabinet' }],
         [{ text: '✏️ Ism-familiyani o\'zgartirish', callback_data: 'edit_name' }]
       ]
     }
-  });
-
-  await botCall('sendMessage', {
-    chat_id: chatId,
-    text: 'Pastdagi menyu tugmalaridan ham foydalanishingiz mumkin:',
-    reply_markup: getMainKeyboard()
   });
 }
 
@@ -350,8 +350,9 @@ async function handleMessage(message) {
 
     await botCall('sendMessage', {
       chat_id: chatId,
-      text: `🎉 *Tabriklaymiz, ${user.fullName}!* Ism va familiyangiz muvaffaqiyatli saqlandi.\n\nSiz uchun **AI Video Prompt Studio** saytiga kirish havolasi tayyorlandi 👇`,
-      parse_mode: 'Markdown'
+      text: `🎉 *Tabriklaymiz, ${user.fullName}!* Ism va familiyangiz muvaffaqiyatli saqlandi.`,
+      parse_mode: 'Markdown',
+      reply_markup: getMainKeyboard(user)
     });
 
     // Ism-familiyadan so'ng darhol saytga kirish uchun link beramiz!
@@ -401,7 +402,8 @@ ${tgSuggested ? `_(Tavsiya: ${tgSuggested})_` : '_(Masalan: Asliddin Nematullaye
       text: `👋 *Assalomu alaykum, ${user.fullName}!*
 
 🎬 **AI Video Prompt Studio** tizimiga qayta xush kelibsiz!`,
-      parse_mode: 'Markdown'
+      parse_mode: 'Markdown',
+      reply_markup: getMainKeyboard(user)
     });
 
     await sendLoginLinks(chatId, user);

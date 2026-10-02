@@ -61,12 +61,21 @@ export function StudioProvider({ children }) {
     return translations[lang]?.[key] || translations['en']?.[key] || key;
   };
 
-  // Check auth_token or tg_user query param on mount
+  // Check auth_token, tg_user query param, or Telegram WebApp on mount
   useEffect(() => {
+    // 1. Initialize Telegram WebApp SDK if running inside Telegram
+    if (window.Telegram?.WebApp) {
+      try {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+      } catch (e) {
+        console.warn('Telegram WebApp error:', e);
+      }
+    }
+
     const params = new URLSearchParams(window.location.search);
     const token = params.get('auth_token');
     const tgUserParam = params.get('tg_user');
-
     const hash = window.location.hash || '';
 
     if (tgUserParam) {
@@ -76,6 +85,7 @@ export function StudioProvider({ children }) {
           const profile = authService.saveTelegramUser(decoded);
           setTelegramUserState(profile);
           setUser(authService.getUser());
+          setAuthModalOpen(false);
           addToast(`Xush kelibsiz, ${profile.fullName || profile.name}!`, 'success');
           setCurrentView(hash.includes('history') ? 'history' : 'dashboard');
         }
@@ -90,6 +100,7 @@ export function StudioProvider({ children }) {
         if (verifiedUser) {
           setTelegramUserState(verifiedUser);
           setUser(authService.getUser());
+          setAuthModalOpen(false);
           addToast(`Xush kelibsiz, ${verifiedUser.fullName || verifiedUser.name}!`, 'success');
           setCurrentView(hash.includes('history') ? 'history' : 'dashboard');
         }
@@ -98,12 +109,36 @@ export function StudioProvider({ children }) {
       const newUrl = window.location.pathname;
       window.history.replaceState({}, document.title, newUrl);
     } else {
+      // Check if user is opening inside Telegram WebApp with native user data
+      const tgNativeUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
       const existing = authService.getTelegramUser();
-      if (!existing) {
+
+      if (tgNativeUser && !existing) {
+        const fullName = [tgNativeUser.first_name, tgNativeUser.last_name].filter(Boolean).join(' ') || tgNativeUser.username || 'AI Rejissyor';
+        const profile = authService.saveTelegramUser({
+          telegramId: tgNativeUser.id,
+          fullName,
+          name: fullName,
+          firstName: tgNativeUser.first_name || '',
+          lastName: tgNativeUser.last_name || '',
+          username: tgNativeUser.username || '',
+          avatarUrl: tgNativeUser.photo_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(fullName)}&backgroundColor=6366f1,8b5cf6`,
+          role: 'Kino Rejissyor / AI Prompt Muhandisi',
+          tier: 'Studio Pro (Tasdiqlangan)',
+          isTelegramVerified: true
+        });
+        setTelegramUserState(profile);
+        setUser(authService.getUser());
+        setAuthModalOpen(false);
+        addToast(`Xush kelibsiz, ${fullName}!`, 'success');
+        setCurrentView(hash.includes('history') ? 'history' : 'dashboard');
+      } else if (!existing) {
         const timer = setTimeout(() => {
           setAuthModalOpen(true);
         }, 1200);
         return () => clearTimeout(timer);
+      } else if (hash.includes('history')) {
+        setCurrentView('history');
       }
     }
   }, []);
