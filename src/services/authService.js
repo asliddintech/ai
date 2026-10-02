@@ -43,7 +43,17 @@ export const authService = {
   getUser() {
     try {
       const data = localStorage.getItem(USER_KEY);
-      if (data) return JSON.parse(data);
+      if (data) {
+        const parsed = JSON.parse(data);
+        return {
+          ...DEFAULT_USER,
+          ...parsed,
+          usage: {
+            ...DEFAULT_USER.usage,
+            ...(parsed?.usage || {})
+          }
+        };
+      }
     } catch (e) {
       console.warn(e);
     }

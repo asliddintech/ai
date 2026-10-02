@@ -117,14 +117,14 @@ export function Topbar({ setMobileOpen }) {
           >
             <div className="relative">
               <img
-                src={telegramUser.avatarUrl || user.avatarUrl}
-                alt={telegramUser.fullName || user.name}
+                src={telegramUser?.avatarUrl || user?.avatarUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=creator'}
+                alt={telegramUser?.fullName || user?.name || 'Ijodkor'}
                 className="w-6 h-6 rounded-full object-cover border border-indigo-400/30"
               />
               <span className="w-2 h-2 rounded-full bg-emerald-400 absolute -bottom-0.5 -right-0.5 ring-1 ring-studio-950" />
             </div>
             <span className="font-medium text-xs truncate max-w-[100px] sm:max-w-[130px] hidden sm:inline">
-              {telegramUser.fullName || user.name}
+              {telegramUser?.fullName || user?.name || 'Ijodkor'}
             </span>
             <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-500/30 px-1.5 py-0.5 rounded hidden md:inline">
               Kabinet

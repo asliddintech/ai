@@ -114,27 +114,37 @@ export function Sidebar({ mobileOpen = false, setMobileOpen }) {
         {/* Bottom Profile & Usage */}
         <div className="p-3 border-t border-white/[0.06] bg-studio-900/40">
           {/* Usage Meter */}
-          <div className="p-2.5 rounded-lg bg-studio-900 border border-white/5 mb-3">
-            <div className="flex items-center justify-between text-[11px] mb-1.5">
-              <span className="text-studio-400 flex items-center gap-1 font-mono">
-                <Cpu className="w-3 h-3 text-cyan-400" />
-                {t('aiComputes')}
-              </span>
-              <span className="font-mono text-studio-200">
-                {user.usage.generationsUsed} / {user.usage.generationsMax}
-              </span>
-            </div>
-            <div className="w-full bg-studio-800 h-1.5 rounded-full overflow-hidden">
-              <div 
-                className="bg-gradient-to-r from-indigo-500 to-cyan-400 h-full rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, (user.usage.generationsUsed / user.usage.generationsMax) * 100)}%` }}
-              />
-            </div>
-            <div className="mt-1.5 flex justify-between items-center text-[10px] text-studio-400 font-mono">
-              <span>{user.usage.scenesGenerated} {t('scenesBuilt')}</span>
-              <span className="text-emerald-400">{t('proTier')}</span>
-            </div>
-          </div>
+          {(() => {
+            const usage = user?.usage || { generationsUsed: 12, generationsMax: 100, scenesGenerated: 48 };
+            const used = usage.generationsUsed ?? 0;
+            const max = usage.generationsMax ?? 100;
+            const scenesCount = usage.scenesGenerated ?? 0;
+            const pct = Math.min(100, Math.max(0, (used / max) * 100));
+
+            return (
+              <div className="p-2.5 rounded-lg bg-studio-900 border border-white/5 mb-3">
+                <div className="flex items-center justify-between text-[11px] mb-1.5">
+                  <span className="text-studio-400 flex items-center gap-1 font-mono">
+                    <Cpu className="w-3 h-3 text-cyan-400" />
+                    {t('aiComputes')}
+                  </span>
+                  <span className="font-mono text-studio-200">
+                    {used} / {max}
+                  </span>
+                </div>
+                <div className="w-full bg-studio-800 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-gradient-to-r from-indigo-500 to-cyan-400 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <div className="mt-1.5 flex justify-between items-center text-[10px] text-studio-400 font-mono">
+                  <span>{scenesCount} {t('scenesBuilt')}</span>
+                  <span className="text-emerald-400">{t('proTier')}</span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Telegram Auth Banner or Profile Card */}
           {!telegramUser && (
@@ -163,8 +173,8 @@ export function Sidebar({ mobileOpen = false, setMobileOpen }) {
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="relative shrink-0">
                 <img
-                  src={user.avatarUrl}
-                  alt={user.name}
+                  src={user?.avatarUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=guest'}
+                  alt={user?.name || 'Ijodkor'}
                   className="w-8 h-8 rounded-full border border-white/10 object-cover bg-studio-950"
                 />
                 {telegramUser && (
@@ -173,13 +183,13 @@ export function Sidebar({ mobileOpen = false, setMobileOpen }) {
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-studio-100 truncate group-hover:text-white">
-                  {user.name}
+                  {user?.name || 'Ijodkor'}
                 </p>
                 <p className="text-[10px] text-studio-400 truncate flex items-center gap-1">
                   {telegramUser ? (
                     <span className="text-cyan-400 font-mono">Shaxsiy Kabinet →</span>
                   ) : (
-                    <span>{user.role}</span>
+                    <span>{user?.role || 'AI Video Rejissyor'}</span>
                   )}
                 </p>
               </div>
