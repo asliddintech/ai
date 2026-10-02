@@ -61,11 +61,28 @@ export function StudioProvider({ children }) {
     return translations[lang]?.[key] || translations['en']?.[key] || key;
   };
 
-  // Check auth_token query param or prompt for telegram auth on mount
+  // Check auth_token or tg_user query param on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('auth_token');
-    if (token) {
+    const tgUserParam = params.get('tg_user');
+
+    if (tgUserParam) {
+      try {
+        const decoded = JSON.parse(decodeURIComponent(atob(tgUserParam)));
+        if (decoded && (decoded.fullName || decoded.name)) {
+          const profile = authService.saveTelegramUser(decoded);
+          setTelegramUserState(profile);
+          setUser(authService.getUser());
+          addToast(`Xush kelibsiz, ${profile.fullName || profile.name}!`, 'success');
+        }
+      } catch (err) {
+        console.error('Error decoding tg_user param:', err);
+      }
+      // Clean query string
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    } else if (token) {
       authService.verifyAuthToken(token).then((verifiedUser) => {
         if (verifiedUser) {
           setTelegramUserState(verifiedUser);

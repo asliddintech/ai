@@ -120,9 +120,11 @@ export const authService = {
   async initTelegramSession() {
     try {
       const res = await fetch('/api/auth/init-session', { method: 'POST' });
+      if (!res.ok) throw new Error('API unavailable');
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) throw new Error('Not JSON');
       return await res.json();
     } catch (err) {
-      console.error('[authService] initTelegramSession failed:', err);
       // Fallback direct URL if backend unreachable
       return {
         sessionToken: 'sess_fallback_' + Date.now(),
@@ -134,11 +136,16 @@ export const authService = {
 
   // API Call: Check session status
   async checkSessionStatus(sessionToken) {
+    if (!sessionToken || sessionToken.startsWith('sess_fallback_')) {
+      return { authenticated: false };
+    }
     try {
       const res = await fetch(`/api/auth/status?sessionToken=${encodeURIComponent(sessionToken)}`);
+      if (!res.ok) return { authenticated: false };
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) return { authenticated: false };
       return await res.json();
     } catch (err) {
-      console.error('[authService] checkSessionStatus failed:', err);
       return { authenticated: false };
     }
   },
@@ -147,6 +154,9 @@ export const authService = {
   async verifyAuthToken(token) {
     try {
       const res = await fetch(`/api/auth/verify?token=${encodeURIComponent(token)}`);
+      if (!res.ok) return null;
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) return null;
       const data = await res.json();
       if (data.success && data.user) {
         return this.saveTelegramUser(data.user);

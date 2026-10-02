@@ -9,6 +9,25 @@ const BOT_TOKEN = '8810947397:AAEhyH6R8u5xyo38d9K0PX2h_-xSEl_X0Wg';
 const BOT_API_URL = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const BOT_FILE_URL = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
 const BOT_USERNAME = 'yordamchia_bot';
+const VERCEL_URL = process.env.PUBLIC_URL || 'https://ai-asliddin5.vercel.app';
+
+function encodeUserDataForUrl(user) {
+  const cleanUser = {
+    telegramId: user.telegramId,
+    fullName: user.fullName || user.name,
+    firstName: user.firstName || '',
+    lastName: user.lastName || '',
+    username: user.username || '',
+    role: user.role || 'Kino Rejissyor / AI Prompt Muhandisi',
+    tier: user.tier || 'Studio Pro (Tasdiqlangan)',
+    avatarUrl: user.avatarUrl?.startsWith('/api') 
+      ? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.fullName || 'Rejissyor')}&backgroundColor=6366f1,8b5cf6`
+      : (user.avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.fullName || 'Rejissyor')}&backgroundColor=6366f1,8b5cf6`),
+    token: user.token,
+    registeredAt: user.registeredAt || Date.now()
+  };
+  return Buffer.from(encodeURIComponent(JSON.stringify(cleanUser))).toString('base64');
+}
 
 // Ensure data folder exists
 const DATA_DIR = path.resolve(__dirname, 'data');
@@ -219,8 +238,10 @@ async function ensureUser(from, customName = null) {
 
 // Helper: Send direct links in text and with buttons
 async function sendLoginLinks(chatId, user) {
-  const viteUrl = `http://localhost:5173/?auth_token=${user.token}`;
-  const prodUrl = `http://localhost:3001/?auth_token=${user.token}`;
+  const encoded = encodeUserDataForUrl(user);
+  const vercelUrl = `${VERCEL_URL}/?auth_token=${user.token}&tg_user=${encoded}`;
+  const viteUrl = `http://localhost:5173/?auth_token=${user.token}&tg_user=${encoded}`;
+  const prodUrl = `http://localhost:3001/?auth_token=${user.token}&tg_user=${encoded}`;
 
   const textMessage = 
 `🎬 *AI VIDEO PROMPT STUDIO — SAYTGA KIRISH*
@@ -228,15 +249,15 @@ async function sendLoginLinks(chatId, user) {
 👤 *Foydalanuvchi:* *${user.fullName || user.name}*
 🌟 *Maqomi:* ${user.tier || 'Studio Pro'}
 
-Studiyaga kirish uchun quyidagi havolalardan birini bosing:
+Studiyaga kirish uchun rasmiy havolalar:
 
-🔗 *1. Asosiy Studio (Vite):*
+🌐 *1. Jonli Vercel Sayti (Asosiy):*
+👉 ${vercelUrl}
+
+💻 *2. Lokal Studio (Vite kompyuter):*
 👉 ${viteUrl}
 
-🔗 *2. To'liq Server Studiyasi (Port 3001):*
-👉 ${prodUrl}
-
-💡 *Eslatma:* Ushbu havola orqali kirsangiz, ism-familiyangiz va Telegram suratingiz veb-saytda avtomatik ochiladi!`;
+💡 *Eslatma:* Ushbu havola orqali kirsangiz, ism-familiyangiz va profilingiz saytda darhol avtomatik ochiladi hamda Shaxsiy Kabinetga kirasiz!`;
 
   await botCall('sendMessage', {
     chat_id: chatId,
@@ -245,8 +266,8 @@ Studiyaga kirish uchun quyidagi havolalardan birini bosing:
     disable_web_page_preview: true,
     reply_markup: {
       inline_keyboard: [
-        [{ text: '🚀 Studiyani Ochish (Vite - 5173)', url: viteUrl }],
-        [{ text: '⚡ Server Studiyasini Ochish (3001)', url: prodUrl }],
+        [{ text: '🌐 Jonli Vercel Saytiga Kirish', url: vercelUrl }],
+        [{ text: '🚀 Lokal Studiyani Ochish (Vite)', url: viteUrl }],
         [{ text: '👤 Shaxsiy Kabinet', callback_data: 'view_cabinet' }]
       ]
     }
@@ -376,6 +397,7 @@ async function handleMessage(message) {
   // 4. Shaxsiy Kabinet / /cabinet
   if (text === '👤 Shaxsiy Kabinet' || text === '/cabinet') {
     user = await ensureUser(from);
+    const encoded = encodeUserDataForUrl(user);
 
     const regDate = new Date(user.registeredAt || Date.now()).toLocaleDateString('uz-UZ', {
       year: 'numeric',
@@ -383,8 +405,8 @@ async function handleMessage(message) {
       day: 'numeric'
     });
 
-    const viteLink = `http://localhost:5173/?auth_token=${user.token}`;
-    const prodLink = `http://localhost:3001/?auth_token=${user.token}`;
+    const vercelLink = `${VERCEL_URL}/?auth_token=${user.token}&tg_user=${encoded}`;
+    const viteLink = `http://localhost:5173/?auth_token=${user.token}&tg_user=${encoded}`;
 
     await botCall('sendMessage', {
       chat_id: chatId,
@@ -397,16 +419,17 @@ async function handleMessage(message) {
 📅 *Ro'yxatdan o'tgan:* ${regDate}
 🎯 *Roli:* ${user.role}
 
-🔗 *Saytga to'g'ridan-to'g'ri kirish havolasi:*
-👉 ${viteLink}
-yoki server orqali:
-👉 ${prodLink}`,
+🔗 *Saytga kirish havolasi (Jonli Vercel):*
+👉 ${vercelLink}
+
+💻 *Lokal havola (kompyuterda):*
+👉 ${viteLink}`,
       parse_mode: 'Markdown',
       disable_web_page_preview: true,
       reply_markup: {
         inline_keyboard: [
+          [{ text: '🌐 Jonli Saytga Kirish (Vercel)', url: vercelLink }],
           [{ text: '🎬 Saytga Kirish (Vite)', url: viteLink }],
-          [{ text: '⚡ Saytga Kirish (Server 3001)', url: prodLink }],
           [{ text: '✏️ Ism-familiyani o\'zgartirish', callback_data: 'edit_name' }]
         ]
       }
@@ -436,7 +459,9 @@ Quyidagi amallardan birini tanlang:`,
   // 6. Mening Loyihalarim / /projects
   if (text === '📊 Mening Loyihalarim' || text === '/projects') {
     user = await ensureUser(from);
-    const webLink = `http://localhost:5173/history?auth_token=${user.token}`;
+    const encoded = encodeUserDataForUrl(user);
+    const vercelLink = `${VERCEL_URL}/?auth_token=${user.token}&tg_user=${encoded}#history`;
+    const viteLink = `http://localhost:5173/?auth_token=${user.token}&tg_user=${encoded}#history`;
 
     await botCall('sendMessage', {
       chat_id: chatId,
@@ -445,12 +470,13 @@ Quyidagi amallardan birini tanlang:`,
 AI Video Prompt Studio-da yaratgan barcha video prompt loyihalaringiz bulutli va lokal xotirada saqlanadi.
 
 🔗 *Loyihalarni ko'rish havolasi:*
-👉 ${webLink}`,
+👉 ${vercelLink}`,
       parse_mode: 'Markdown',
       disable_web_page_preview: true,
       reply_markup: {
         inline_keyboard: [
-          [{ text: '📂 Loyihalar Tarixini Ochish', url: webLink }]
+          [{ text: '📂 Loyihalar Tarixini Ochish (Vercel)', url: vercelLink }],
+          [{ text: '💻 Lokal Studio Tarixi', url: viteLink }]
         ]
       }
     });
@@ -460,7 +486,8 @@ AI Video Prompt Studio-da yaratgan barcha video prompt loyihalaringiz bulutli va
   // 7. Yordam / Qo'llanma / /help
   if (text === 'ℹ️ Yordam / Qo\'llanma' || text === '/help') {
     user = await ensureUser(from);
-    const viteLink = `http://localhost:5173/?auth_token=${user.token}`;
+    const encoded = encodeUserDataForUrl(user);
+    const vercelLink = `${VERCEL_URL}/?auth_token=${user.token}&tg_user=${encoded}`;
 
     await botCall('sendMessage', {
       chat_id: chatId,
@@ -477,12 +504,12 @@ Oddiy g'oyalarni (masalan: *"Toshkentda tunda futuristik dastur yaratayotgan muh
 • **Pika 2.0** — vizual effektlar
 
 🔗 *Saytga kirish havolasi:*
-👉 ${viteLink}`,
+👉 ${vercelLink}`,
       parse_mode: 'Markdown',
       disable_web_page_preview: true,
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🎬 Saytga O\'tish', url: viteLink }]
+          [{ text: '🎬 Saytga O\'tish (Vercel)', url: vercelLink }]
         ]
       }
     });
@@ -514,13 +541,14 @@ async function handleCallbackQuery(cbQuery) {
   let user = await ensureUser(cbQuery.from);
 
   if (data === 'view_cabinet') {
+    const encoded = encodeUserDataForUrl(user);
     const regDate = new Date(user.registeredAt || Date.now()).toLocaleDateString('uz-UZ', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
-    const viteLink = `http://localhost:5173/?auth_token=${user.token}`;
-    const prodLink = `http://localhost:3001/?auth_token=${user.token}`;
+    const vercelLink = `${VERCEL_URL}/?auth_token=${user.token}&tg_user=${encoded}`;
+    const viteLink = `http://localhost:5173/?auth_token=${user.token}&tg_user=${encoded}`;
 
     await botCall('sendMessage', {
       chat_id: chatId,
@@ -533,15 +561,13 @@ async function handleCallbackQuery(cbQuery) {
 📅 *Ro'yxatdan o'tgan:* ${regDate}
 
 🔗 *Saytga kirish havolasi:*
-👉 ${viteLink}
-yoki server orqali:
-👉 ${prodLink}`,
+👉 ${vercelLink}`,
       parse_mode: 'Markdown',
       disable_web_page_preview: true,
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🚀 Studiyani Ochish (Vite)', url: viteLink }],
-          [{ text: '⚡ Server Studiyasini Ochish (3001)', url: prodLink }],
+          [{ text: '🌐 Jonli Vercel Saytiga Kirish', url: vercelLink }],
+          [{ text: '🚀 Lokal Studio (Vite)', url: viteLink }],
           [{ text: '✏️ Ism-familiyani o\'zgartirish', callback_data: 'edit_name' }]
         ]
       }
