@@ -12,6 +12,22 @@
     "tier": "Studio Pro (Tasdiqlangan)",
     "token": "tok_c2bfortnmuqwbgeo",
     "registeredAt": 1790940781038,
+    "projectsCount": 0,
+    "isNameRegistered": true
+  },
+  "5327124471": {
+    "telegramId": 5327124471,
+    "id": 5327124471,
+    "firstName": "нематов",
+    "lastName": "",
+    "fullName": "нематов",
+    "name": "нематов",
+    "username": "nematvv1",
+    "avatarUrl": "https://api.dicebear.com/7.x/bottts/svg?seed=5327124471",
+    "role": "Kino Rejissyor / AI Prompt Muhandisi",
+    "tier": "Studio Pro (Tasdiqlangan)",
+    "token": "tok_se86u8mimuqxv6u4",
+    "registeredAt": 1790944083706,
     "projectsCount": 0
   }
 }

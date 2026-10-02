@@ -203,12 +203,13 @@ function getMainKeyboard() {
 // Helper: Ensure user is registered or create on the spot
 async function ensureUser(from, customName = null) {
   let user = users[from.id];
+  const firstName = from.first_name || '';
+  const lastName = from.last_name || '';
+  const avatarUrl = await getUserAvatarUrl(from.id);
+
   if (!user) {
-    const firstName = from.first_name || 'Creator';
-    const lastName = from.last_name || '';
-    const fullName = customName || `${firstName} ${lastName}`.trim() || 'AI Rejissyor';
+    const fullName = customName || [firstName, lastName].filter(Boolean).join(' ') || 'AI Rejissyor';
     const token = 'tok_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-    const avatarUrl = await getUserAvatarUrl(from.id);
 
     user = {
       telegramId: from.id,
@@ -223,13 +224,21 @@ async function ensureUser(from, customName = null) {
       tier: 'Studio Pro (Tasdiqlangan)',
       token,
       registeredAt: Date.now(),
-      projectsCount: 0
+      projectsCount: 0,
+      isNameRegistered: Boolean(customName)
     };
     users[from.id] = user;
     saveUsers();
-  } else if (customName) {
-    user.fullName = customName;
-    user.name = customName;
+  } else {
+    if (customName) {
+      user.fullName = customName;
+      user.name = customName;
+      user.isNameRegistered = true;
+    }
+    if (avatarUrl && (!user.avatarUrl || user.avatarUrl.includes('dicebear'))) {
+      user.avatarUrl = avatarUrl;
+    }
+    user.username = from.username || user.username || '';
     users[from.id] = user;
     saveUsers();
   }
@@ -241,23 +250,20 @@ async function sendLoginLinks(chatId, user) {
   const encoded = encodeUserDataForUrl(user);
   const vercelUrl = `${VERCEL_URL}/?auth_token=${user.token}&tg_user=${encoded}`;
   const viteUrl = `http://localhost:5173/?auth_token=${user.token}&tg_user=${encoded}`;
-  const prodUrl = `http://localhost:3001/?auth_token=${user.token}&tg_user=${encoded}`;
 
   const textMessage = 
 `🎬 *AI VIDEO PROMPT STUDIO — SAYTGA KIRISH*
 
 👤 *Foydalanuvchi:* *${user.fullName || user.name}*
 🌟 *Maqomi:* ${user.tier || 'Studio Pro'}
+🆔 *ID:* \`${user.telegramId}\`
 
-Studiyaga kirish uchun rasmiy havolalar:
+Studiyaga kirish uchun rasmiy havola:
 
-🌐 *1. Jonli Vercel Sayti (Asosiy):*
+🌐 *Jonli Saytga Kirish (Vercel):*
 👉 ${vercelUrl}
 
-💻 *2. Lokal Studio (Vite kompyuter):*
-👉 ${viteUrl}
-
-💡 *Eslatma:* Ushbu havola orqali kirsangiz, ism-familiyangiz va profilingiz saytda darhol avtomatik ochiladi hamda Shaxsiy Kabinetga kirasiz!`;
+💡 *Eslatma:* Ushbu havola orqali kirsangiz, ism-familiyangiz va Telegram suratingiz saytda darhol avtomatik ochiladi hamda Shaxsiy Kabinetingizga kirasiz!`;
 
   await botCall('sendMessage', {
     chat_id: chatId,
@@ -266,16 +272,16 @@ Studiyaga kirish uchun rasmiy havolalar:
     disable_web_page_preview: true,
     reply_markup: {
       inline_keyboard: [
-        [{ text: '🌐 Jonli Vercel Saytiga Kirish', url: vercelUrl }],
-        [{ text: '🚀 Lokal Studiyani Ochish (Vite)', url: viteUrl }],
-        [{ text: '👤 Shaxsiy Kabinet', callback_data: 'view_cabinet' }]
+        [{ text: '🚀 Saytga Kirish (Vercel)', url: vercelUrl }],
+        [{ text: '👤 Shaxsiy Kabinet', callback_data: 'view_cabinet' }],
+        [{ text: '✏️ Ism-familiyani o\'zgartirish', callback_data: 'edit_name' }]
       ]
     }
   });
 
   await botCall('sendMessage', {
     chat_id: chatId,
-    text: 'Pastdagi menyu tugmalaridan foydalanishingiz mumkin:',
+    text: 'Pastdagi menyu tugmalaridan ham foydalanishingiz mumkin:',
     reply_markup: getMainKeyboard()
   });
 }
@@ -304,43 +310,30 @@ async function handleMessage(message) {
 
   let user = users[telegramId];
 
-  // 1. Agar foydalanuvchi "Saytga Kirish" tugmasini bossa yoki link so'rasa
-  if (
-    text === '🎬 Saytga Kirish' ||
-    lowerText.includes('saytga kirish') ||
-    lowerText.includes('saytga kir') ||
-    lowerText === 'sayt' ||
-    lowerText === 'link' ||
-    lowerText === 'havola' ||
-    text === '/login'
-  ) {
-    delete userStates[telegramId];
-    user = await ensureUser(from);
+  // 1. Agar foydalanuvchi ism-familiyasini kiritayotgan bo'lsa yoki hali nomi belgilanmagan bo'lsa
+  const isAwaitingName = userStates[telegramId] === 'awaiting_name';
+  const isPlainNameInput = (!user || !user.isNameRegistered) && 
+    !text.startsWith('/') && 
+    text !== '🎬 Saytga Kirish' && 
+    text !== '👤 Shaxsiy Kabinet' && 
+    text !== '⚙️ Sozlamalar' && 
+    text !== '📊 Mening Loyihalarim' && 
+    text !== 'ℹ️ Yordam / Qo\'llanma';
 
-    const pendingSession = userStates[`pending_session_${telegramId}`];
-    if (pendingSession && sessions[pendingSession]) {
-      sessions[pendingSession].authenticated = true;
-      sessions[pendingSession].user = user;
-      saveSessions();
-      delete userStates[`pending_session_${telegramId}`];
-    }
-
-    await sendLoginLinks(chatId, user);
-    return;
-  }
-
-  // 2. Agar foydalanuvchi ism-familiyasini kiritayotgan bo'lsa
-  if (userStates[telegramId] === 'awaiting_name') {
+  if (isAwaitingName || isPlainNameInput) {
     if (text.length < 3) {
       await botCall('sendMessage', {
         chat_id: chatId,
-        text: '⚠️ Iltimos, ism va familiyangizni to\'liq kiriting (masalan: *Sardor Rahimiy*):',
+        text: '⚠️ Iltimos, ism va familiyangizni to\'liq yozing (masalan: *Asliddin Nematullayev*):',
         parse_mode: 'Markdown'
       });
       return;
     }
 
     user = await ensureUser(from, text);
+    user.isNameRegistered = true;
+    users[telegramId] = user;
+    saveUsers();
     delete userStates[telegramId];
 
     const pendingSession = userStates[`pending_session_${telegramId}`];
@@ -353,15 +346,16 @@ async function handleMessage(message) {
 
     await botCall('sendMessage', {
       chat_id: chatId,
-      text: `🎉 *Tabriklaymiz, ${user.fullName}!* Ismingiz muvaffaqiyatli saqlandi.`,
+      text: `🎉 *Tabriklaymiz, ${user.fullName}!* Ism va familiyangiz muvaffaqiyatli saqlandi.\n\nSiz uchun **AI Video Prompt Studio** saytiga kirish havolasi tayyorlandi 👇`,
       parse_mode: 'Markdown'
     });
 
+    // Ism-familiyadan so'ng darhol saytga kirish uchun link beramiz!
     await sendLoginLinks(chatId, user);
     return;
   }
 
-  // 3. /start komandasi
+  // 2. /start komandasi
   if (text.startsWith('/start')) {
     const payload = text.split(' ')[1] || '';
     let sessionToken = null;
@@ -374,8 +368,24 @@ async function handleMessage(message) {
       userStates[`pending_session_${telegramId}`] = sessionToken;
     }
 
-    user = await ensureUser(from);
+    // Agar foydalanuvchi hali ism-familiyasini ro'yxatdan o'tkazmagan bo'lsa
+    if (!user || !user.isNameRegistered) {
+      userStates[telegramId] = 'awaiting_name';
+      const tgSuggested = [from.first_name, from.last_name].filter(Boolean).join(' ');
+      await botCall('sendMessage', {
+        chat_id: chatId,
+        text: `👋 *Assalomu alaykum!*
 
+🎬 **AI Video Prompt Studio** tizimiga xush kelibsiz!
+
+Saytda siz uchun Shaxsiy Kabinet ochilishi va to'g'ridan-to'g'ri kirish havolasi berilishi uchun, iltimos, **Ism va Familiyangizni** yozib yuboring:
+${tgSuggested ? `_(Tavsiya: ${tgSuggested})_` : '_(Masalan: Asliddin Nematullayev)_'}`,
+        parse_mode: 'Markdown'
+      });
+      return;
+    }
+
+    // Agar allaqachon ro'yxatdan o'tgan bo'lsa
     if (sessionToken && sessions[sessionToken]) {
       sessions[sessionToken].authenticated = true;
       sessions[sessionToken].user = user;
@@ -386,9 +396,41 @@ async function handleMessage(message) {
       chat_id: chatId,
       text: `👋 *Assalomu alaykum, ${user.fullName}!*
 
-**AI Video Prompt Studio** tizimiga xush kelibsiz!`,
+🎬 **AI Video Prompt Studio** tizimiga qayta xush kelibsiz!`,
       parse_mode: 'Markdown'
     });
+
+    await sendLoginLinks(chatId, user);
+    return;
+  }
+
+  // 3. Agar foydalanuvchi "Saytga Kirish" tugmasini bossa yoki link so'rasa
+  if (
+    text === '🎬 Saytga Kirish' ||
+    lowerText.includes('saytga kirish') ||
+    lowerText.includes('saytga kir') ||
+    lowerText === 'sayt' ||
+    lowerText === 'link' ||
+    lowerText === 'havola' ||
+    text === '/login'
+  ) {
+    if (!user || !user.isNameRegistered) {
+      userStates[telegramId] = 'awaiting_name';
+      await botCall('sendMessage', {
+        chat_id: chatId,
+        text: `⚠️ Saytga kirish havolasini olish uchun, iltimos, avval **Ism va Familiyangizni** yozib yuboring:\n_(Masalan: Asliddin Nematullayev)_`,
+        parse_mode: 'Markdown'
+      });
+      return;
+    }
+
+    const pendingSession = userStates[`pending_session_${telegramId}`];
+    if (pendingSession && sessions[pendingSession]) {
+      sessions[pendingSession].authenticated = true;
+      sessions[pendingSession].user = user;
+      saveSessions();
+      delete userStates[`pending_session_${telegramId}`];
+    }
 
     await sendLoginLinks(chatId, user);
     return;
@@ -521,14 +563,23 @@ Oddiy g'oyalarni (masalan: *"Toshkentda tunda futuristik dastur yaratayotgan muh
     userStates[telegramId] = 'awaiting_name';
     await botCall('sendMessage', {
       chat_id: chatId,
-      text: 'Yangi ism va familiyangizni yozib yuboring (masalan: *Sardor Rahimiy*):',
+      text: 'Yangi ism va familiyangizni yozib yuboring (masalan: *Asliddin Nematullayev*):',
       parse_mode: 'Markdown'
     });
     return;
   }
 
-  // Default fallback: agar boshqa narsa yozsa ham, saytga kirish linkini taqdim etamiz!
-  user = await ensureUser(from);
+  // Default fallback: agar ro'yxatdan o'tmagan bo'lsa ismini so'raymiz, o'tgan bo'lsa link beramiz!
+  if (!user || !user.isNameRegistered) {
+    userStates[telegramId] = 'awaiting_name';
+    await botCall('sendMessage', {
+      chat_id: chatId,
+      text: 'Saytga kirish uchun, iltimos, avval **Ism va Familiyangizni** yozib yuboring (masalan: *Asliddin Nematullayev*):',
+      parse_mode: 'Markdown'
+    });
+    return;
+  }
+
   await sendLoginLinks(chatId, user);
 }
 
